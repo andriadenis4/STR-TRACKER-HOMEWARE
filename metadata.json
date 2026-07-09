@@ -1,0 +1,6 @@
+{
+  "name": "INFORMA ALAM SUTERA HOMEWARE STR TRACKER",
+  "description": "Stock Transfer Order (STR) Tracker untuk memantau klasifikasi SKU berdasarkan Rak di Informa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
