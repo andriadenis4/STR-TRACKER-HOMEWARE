@@ -306,7 +306,7 @@ export default function RackDetails({ summary, onBack }: RackDetailsProps) {
                   }
 
                   const productInfo = getProductFromSKU(item.sku);
-                  const ruparupaUrl = `https://www.ruparupa.com/search?q=${item.sku}`;
+                  const informaUrl = `https://informa.co.id/search?q=${item.sku}`;
 
                   return (
                     <tr 
@@ -318,12 +318,12 @@ export default function RackDetails({ summary, onBack }: RackDetailsProps) {
                       <td className="px-6 py-4 text-center text-xs font-mono text-gray-400">{index + 1}</td>
                       <td className="px-6 py-4">
                         <a 
-                          href={ruparupaUrl} 
+                          href={informaUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           referrerPolicy="no-referrer"
                           className="block relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group/image"
-                          title="Buka di ruparupa.com"
+                          title="Buka di informa.co.id"
                         >
                           <img 
                             src={productInfo.image} 
@@ -342,14 +342,14 @@ export default function RackDetails({ summary, onBack }: RackDetailsProps) {
                             {item.sku}
                           </span>
                           <a 
-                            href={ruparupaUrl} 
+                            href={informaUrl} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             referrerPolicy="no-referrer"
                             className="inline-flex items-center text-[10px] font-bold text-[#0f4372] hover:text-[#0a3255] hover:underline"
-                            title="Buka pencarian produk di ruparupa.com"
+                            title="Buka pencarian produk di informa.co.id"
                           >
-                            <span>ruparupa.com ↗</span>
+                            <span>informa.co.id ↗</span>
                           </a>
                         </div>
                       </td>
