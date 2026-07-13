@@ -6,6 +6,7 @@
 export interface SKUItem {
   rackCode: string;
   sku: string;
+  name?: string; // Real product name from master STR
   qty: number;
   classification: 'AMAN' | 'DANGER' | 'PERLU STR' | string;
 }

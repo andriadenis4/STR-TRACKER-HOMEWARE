@@ -46,13 +46,13 @@ export default function RackSearch({ rackSummaries, allRacks, onSelectRack }: Ra
   };
 
   const currentHour = new Date().getHours();
-  let periodText = 'pagi';
+  let periodText = 'Malam';
   if (currentHour >= 4 && currentHour < 11) {
-    periodText = 'pagi';
+    periodText = 'Pagi';
   } else if (currentHour >= 11 && currentHour < 18) {
-    periodText = 'siang';
+    periodText = 'Siang';
   } else {
-    periodText = 'malam';
+    periodText = 'Malam';
   }
 
   return (
@@ -60,8 +60,8 @@ export default function RackSearch({ rackSummaries, allRacks, onSelectRack }: Ra
       {/* Welcome Banner */}
       <div className="text-left mb-10" id="welcome-banner">
         <h2 className="text-3xl sm:text-4xl font-light text-slate-700 leading-tight">
-          Halo selamat <span className="font-bold text-[#0f4372]">{periodText}</span> <span className="font-bold text-[#0f4372]">Pak Yuri</span> dan <span className="font-bold text-[#0f4372]">Pak Ongky</span>. 
-          <br/>Mau cek Rak yang mana hari ini?
+          Halo <span className="font-bold text-[#0f4372]">Selamat {periodText}</span> <span className="font-bold text-[#0f4372]">Pak Yuri</span> dan <span className="font-bold text-[#0f4372]">Pak Onky</span>. 
+          <br/>Mau cek rak yang mana hari ini?
         </h2>
         <p className="mt-3 text-sm text-gray-400 font-mono uppercase tracking-wider">
           STR Operations & Verification Portal

@@ -8,31 +8,58 @@ import { SKUItem, RackSummary, GreetingType } from './types';
 export const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1eHRf5foF3bDqApK3EKHHI7hSDSJu4gFGUPT4kHNle2M/export?format=csv&gid=0';
 
 /**
+ * Splits a CSV line by commas while correctly handling double-quoted fields
+ */
+export function splitCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+/**
  * Parses a CSV string into a list of SKU items.
  * Handles rack-code inheritance (where rackCode is blank and inherits from the previous non-blank row).
+ * Specifically maps Column C (NAME), Column D (TOTAL QTY), and Column E (KLASIFIKASI).
  */
 export function parseCSV(csvText: string): SKUItem[] {
   const lines = csvText.split(/\r?\n/);
   const items: SKUItem[] = [];
   let currentRackCode = '';
 
-  // Header is lines[0] -> KODE RAK,ISI SKU RAK,TOTAL QTY SKU,KLASIFIKASI
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Split by comma, handling potential commas inside quotes (though our data doesn't seem to have them)
-    // Simple split works well for this dataset
-    const cols = line.split(',');
-    if (cols.length < 4) continue;
+    const cols = splitCSVLine(line);
+    // Expecting at least: KODE RAK, ISI SKU RAK, NAME, TOTAL QTY SKU, KLASIFIKASI
+    if (cols.length < 5) continue;
 
     const rawRackCode = cols[0].trim();
     const rawSku = cols[1].trim();
-    const rawQtyStr = cols[2].trim();
-    const rawClassification = cols[3].trim().toUpperCase();
+    const rawName = cols[2].trim();
+    const rawQtyStr = cols[3].trim();
+    const rawClassification = cols[4].trim().toUpperCase();
 
-    // Skip empty sku lines (e.g. padding rows)
+    // Skip empty sku lines
     if (!rawSku) continue;
+
+    // Skip "NOT FOUND" items
+    if (rawName.toUpperCase() === 'NOT FOUND' || rawClassification === 'NOT FOUND') {
+      continue;
+    }
 
     if (rawRackCode) {
       currentRackCode = rawRackCode;
@@ -53,6 +80,7 @@ export function parseCSV(csvText: string): SKUItem[] {
     items.push({
       rackCode: currentRackCode,
       sku: rawSku,
+      name: rawName,
       qty,
       classification,
     });
@@ -110,22 +138,23 @@ export function getGreetingType(hour: number): GreetingType {
 }
 
 /**
- * Returns a full greeting string based on the current hour.
+ * Returns a full greeting string based on the current hour with the exact requested spelling,
+ * capitalization, and names.
  */
 export function getGreetingText(currentDate: Date = new Date()): string {
   const hour = currentDate.getHours();
-  const period = getGreetingType(hour);
-  return `Halo selamat ${period} Pak Yuri dan Pak Ongky. Mau cek Rak yang mana hari ini?`;
+  const rawPeriod = getGreetingType(hour);
+  const period = rawPeriod.charAt(0).toUpperCase() + rawPeriod.slice(1);
+  return `Halo Selamat ${period} Pak Yuri dan Pak Onky. Mau cek rak yang mana hari ini?`;
 }
 
 /**
  * Returns deterministic product details (name, image, category) for a given SKU code.
- * All items are linked with high quality images and realistic homeware names from Informa.
+ * Matches keywords dynamically from the product name to display highly relevant product photos.
  */
-export function getProductFromSKU(sku: string): { name: string; image: string; category: string } {
+export function getProductFromSKU(sku: string, customName?: string): { name: string; image: string; category: string } {
   // Pre-defined database of real Informa Appetite homeware products
   const fixedProducts: Record<string, { name: string; image: string; category: string }> = {
-    // 1. Appetite Lennox series (Premium white & gold porcelain tableware)
     '10657070': {
       name: 'Appetite Lennox Mangkuk Saji Porcelain Square 29 cm - Putih/Gold',
       category: 'Kitchen & Dining',
@@ -161,8 +190,6 @@ export function getProductFromSKU(sku: string): { name: string; image: string; c
       category: 'Kitchen & Dining',
       image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&auto=format&fit=crop&q=80'
     },
-
-    // 2. Appetite Delicia series (Sage green ceramic kitchenware)
     '10675291': {
       name: 'Appetite Delicia Set Piring Makan Keramik 4 Pcs - Hijau Sage',
       category: 'Kitchen & Dining',
@@ -188,8 +215,6 @@ export function getProductFromSKU(sku: string): { name: string; image: string; c
       category: 'Kitchen & Dining',
       image: 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=400&auto=format&fit=crop&q=80'
     },
-
-    // 3. Appetite Gourmet series (Cookware & preparation)
     '10445960': {
       name: 'Appetite Gourmet Wajan Penggorengan Teflon Non-Stick 26cm',
       category: 'Kitchen & Dining',
@@ -210,8 +235,6 @@ export function getProductFromSKU(sku: string): { name: string; image: string; c
       category: 'Kitchen & Dining',
       image: 'https://images.unsplash.com/photo-1590794056226-79ef3a8147e1?w=400&auto=format&fit=crop&q=80'
     },
-
-    // 4. Appetite Vetro series (Premium glassware)
     '10606309': {
       name: 'Appetite Vetro Gelas Kaca Double Wall 250ml',
       category: 'Kitchen & Dining',
@@ -227,15 +250,11 @@ export function getProductFromSKU(sku: string): { name: string; image: string; c
       category: 'Kitchen & Dining',
       image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&auto=format&fit=crop&q=80'
     },
-
-    // 5. Appetite Amara series (Flatware)
     '10593213': {
       name: 'Appetite Amara Set Alat Makan Sendok & Garpu Stainless Steel 24 Pcs',
       category: 'Kitchen & Dining',
       image: 'https://images.unsplash.com/photo-1543510473-ac2c35329a28?w=400&auto=format&fit=crop&q=80'
     },
-
-    // 6. Other listed SKUs from SW01
     '10556192': {
       name: 'Appetite Classy Wadah Bumbu Dapur Keramik Dengan Rak Kayu',
       category: 'Kitchen & Dining',
@@ -258,45 +277,74 @@ export function getProductFromSKU(sku: string): { name: string; image: string; c
     },
   };
 
-  // If the SKU exists in our high-fidelity real database, return it
-  if (fixedProducts[sku]) {
-    return fixedProducts[sku];
+  // 1. Resolve product name
+  let resolvedName = '';
+  if (customName && customName.trim()) {
+    resolvedName = customName.trim();
+  } else if (fixedProducts[sku]) {
+    resolvedName = fixedProducts[sku].name;
+  } else {
+    // Generate a realistic fallback name if none is provided
+    const typesFallback = [
+      { type: 'Mangkuk Saji Keramik' },
+      { type: 'Piring Makan Porcelain' },
+      { type: 'Gelas Kaca Double Wall' },
+      { type: 'Cangkir Kopi & Saucer' },
+      { type: 'Teko Teh Keramik' },
+      { type: 'Wajan Frying Pan' },
+      { type: 'Set Sendok & Garpu' },
+      { type: 'Panci Saucepan Stainless' },
+      { type: 'Wadah Saji Prasmanan' },
+    ];
+
+    const brandsFallback = ['Appetite', 'Informa', 'Appetite Delicia', 'Appetite Gourmet', 'Appetite Vetro'];
+    const variantsFallback = ['Nordic', 'Classic', 'Elegant', 'Minimalis', 'Aesthetic', 'Modern', 'Premium'];
+    const colorsFallback = ['Putih', 'Abu-Abu', 'Sage Green', 'Hitam', 'Biru', 'Gold Accent', 'Clear Kaca'];
+
+    let hash = 0;
+    for (let i = 0; i < sku.length; i++) {
+      hash = sku.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    hash = Math.abs(hash);
+
+    const t = typesFallback[hash % typesFallback.length];
+    const b = brandsFallback[(hash >> 2) % brandsFallback.length];
+    const v = variantsFallback[(hash >> 4) % variantsFallback.length];
+    const c = colorsFallback[(hash >> 6) % colorsFallback.length];
+
+    resolvedName = `${b} ${v} ${t.type} - ${c}`;
   }
 
-  // Fallback: Generate an exceptionally realistic and appropriate homeware item 
-  // (strictly Kitchen & Dining / Tableware items like Plate, Bowl, Mug, Cup, Pan)
-  const types = [
-    { type: 'Mangkuk Saji Keramik', img: 'https://images.unsplash.com/photo-1574483767531-dfc6a656ac9f?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Piring Makan Porcelain', img: 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Gelas Kaca Double Wall', img: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Cangkir Kopi & Saucer', img: 'https://images.unsplash.com/photo-1577937927133-66ef06acdf18?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Teko Teh Keramik', img: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Wajan Frying Pan', img: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Set Sendok & Garpu', img: 'https://images.unsplash.com/photo-1543510473-ac2c35329a28?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Panci Saucepan Stainless', img: 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?w=400&auto=format&fit=crop&q=80' },
-    { type: 'Wadah Saji Prasmanan', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&auto=format&fit=crop&q=80' },
-  ];
+  // 2. Map image beautifully based on keywords in the product name
+  let resolvedImage = '';
+  const upperName = resolvedName.toUpperCase();
 
-  const brands = ['Appetite', 'Informa', 'Appetite Delicia', 'Appetite Gourmet', 'Appetite Vetro'];
-  const variants = ['Nordic', 'Classic', 'Elegant', 'Minimalis', 'Aesthetic', 'Modern', 'Premium'];
-  const colors = ['Putih', 'Abu-Abu', 'Sage Green', 'Hitam', 'Biru', 'Gold Accent', 'Clear Kaca'];
-
-  let hash = 0;
-  for (let i = 0; i < sku.length; i++) {
-    hash = sku.charCodeAt(i) + ((hash << 5) - hash);
+  if (upperName.includes('PLATE') || upperName.includes('PIRING')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1535850456172-1a2a07b24f5d?w=400&auto=format&fit=crop&q=80'; // Stacked elegant plates
+  } else if (upperName.includes('BOWL') || upperName.includes('MANGKUK') || upperName.includes('MANGKOK')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1574483767531-dfc6a656ac9f?w=400&auto=format&fit=crop&q=80'; // Beautiful ceramic bowl
+  } else if (upperName.includes('CASSEROLE') || upperName.includes('SAJI') || upperName.includes('WADAH')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?w=400&auto=format&fit=crop&q=80'; // Ceramic cookware / casserole
+  } else if (upperName.includes('PAN') || upperName.includes('FRYING') || upperName.includes('WAJAN') || upperName.includes('COOKWARE') || upperName.includes('PANCI')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?w=400&auto=format&fit=crop&q=80'; // Frying pan
+  } else if (upperName.includes('CUP') || upperName.includes('MUG') || upperName.includes('CANGKIR') || upperName.includes('SAUCER') || upperName.includes('TATAKAN')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1517256064527-09c53b2d0bc6?w=400&auto=format&fit=crop&q=80'; // Beautiful mug
+  } else if (upperName.includes('TEA') || upperName.includes('TEKO') || upperName.includes('INFUSER') || upperName.includes('COFFEE')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=400&auto=format&fit=crop&q=80'; // Teapot
+  } else if (upperName.includes('GLASS') || upperName.includes('TUMBLER') || upperName.includes('GELAS') || upperName.includes('VETRO')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&auto=format&fit=crop&q=80'; // Elegant glass
+  } else if (upperName.includes('SPOON') || upperName.includes('SENDOK') || upperName.includes('GARPU') || upperName.includes('FORK') || upperName.includes('KNIFE') || upperName.includes('PISAU') || upperName.includes('CUTLERY')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1543510473-ac2c35329a28?w=400&auto=format&fit=crop&q=80'; // Silverware cutlery
+  } else if (upperName.includes('SET') || upperName.includes('TRAY')) {
+    resolvedImage = 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&auto=format&fit=crop&q=80'; // Serving platter set
+  } else {
+    // If there is a fixed product default image, use it, otherwise fall back to elegant kitchenware setting
+    resolvedImage = fixedProducts[sku]?.image || 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=400&auto=format&fit=crop&q=80';
   }
-  hash = Math.abs(hash);
-
-  const t = types[hash % types.length];
-  const b = brands[(hash >> 2) % brands.length];
-  const v = variants[(hash >> 4) % variants.length];
-  const c = colors[(hash >> 6) % colors.length];
-
-  const name = `${b} ${v} ${t.type} - ${c}`;
 
   return {
-    name,
-    image: t.img,
-    category: 'Kitchen & Dining'
+    name: resolvedName,
+    image: resolvedImage,
+    category: 'Kitchen & Dining',
   };
 }

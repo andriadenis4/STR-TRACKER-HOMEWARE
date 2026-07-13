@@ -283,7 +283,6 @@ export default function RackDetails({ summary, onBack }: RackDetailsProps) {
             <thead className="bg-gray-50 font-bold text-gray-400 text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-6 py-4 w-16 text-center border-b border-gray-200">No</th>
-                <th className="px-6 py-4 border-b border-gray-200 w-24">Foto</th>
                 <th className="px-6 py-4 border-b border-gray-200 w-44">Kode SKU (Artikel)</th>
                 <th className="px-6 py-4 border-b border-gray-200">Nama Barang</th>
                 <th className="px-6 py-4 text-center border-b border-gray-200 w-24">Qty SKU</th>
@@ -305,7 +304,7 @@ export default function RackDetails({ summary, onBack }: RackDetailsProps) {
                     recommendation = 'Jadwalkan STR (Stok Menipis)';
                   }
 
-                  const productInfo = getProductFromSKU(item.sku);
+                  const productInfo = getProductFromSKU(item.sku, item.name);
                   const informaUrl = `https://informa.co.id/search?q=${item.sku}`;
 
                   return (
@@ -316,26 +315,6 @@ export default function RackDetails({ summary, onBack }: RackDetailsProps) {
                       }`}
                     >
                       <td className="px-6 py-4 text-center text-xs font-mono text-gray-400">{index + 1}</td>
-                      <td className="px-6 py-4">
-                        <a 
-                          href={informaUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          referrerPolicy="no-referrer"
-                          className="block relative w-16 h-16 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group/image"
-                          title="Buka di informa.co.id"
-                        >
-                          <img 
-                            src={productInfo.image} 
-                            alt={productInfo.name} 
-                            className="w-full h-full object-cover group-hover/image:scale-110 transition-transform duration-300"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 flex items-center justify-center transition-opacity duration-200">
-                            <ExternalLink className="w-4 h-4 text-white" />
-                          </div>
-                        </a>
-                      </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col space-y-1">
                           <span className="font-mono text-sm font-bold tracking-wider text-gray-900">
@@ -385,7 +364,7 @@ export default function RackDetails({ summary, onBack }: RackDetailsProps) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                     Tidak ada SKU yang cocok dengan filter atau kata kunci pencarian Anda.
                   </td>
                 </tr>
