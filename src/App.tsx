@@ -9,7 +9,15 @@ import RackSearch from './components/RackSearch';
 import RackDetails from './components/RackDetails';
 import RacksOverview from './components/RacksOverview';
 import { SKUItem, RackSummary } from './types';
-import { parseCSV, groupItemsByRack, SHEET_CSV_URL } from './utils';
+import { 
+  parseCSV, 
+  parseInvenLookup, 
+  groupItemsByRack, 
+  SHEET_RACKS_WEB_URL, 
+  SHEET_RACKS_EXPORT_URL, 
+  SHEET_INVEN_WEB_URL, 
+  SHEET_INVEN_EXPORT_URL 
+} from './utils';
 import { FALLBACK_SKU_ITEMS } from './fallbackData';
 import { AlertCircle, HelpCircle, FileText, CheckCircle, Smartphone } from 'lucide-react';
 
@@ -32,13 +40,40 @@ export default function App() {
     }
     setSyncError(null);
 
+    let lookupDict: Record<string, string> = {};
+
+    // 1. Fetch the lookup names sheet (INVEN sheet)
     try {
-      const response = await fetch(SHEET_CSV_URL);
-      if (!response.ok) {
-        throw new Error(`Gagal mengunduh file (HTTP ${response.status})`);
+      let invenResponse = await fetch(SHEET_INVEN_WEB_URL);
+      if (!invenResponse.ok) {
+        invenResponse = await fetch(SHEET_INVEN_EXPORT_URL);
       }
-      const csvText = await response.text();
-      const parsed = parseCSV(csvText);
+      if (invenResponse.ok) {
+        const invenCsvText = await invenResponse.text();
+        lookupDict = parseInvenLookup(invenCsvText);
+        console.log(`Successfully loaded ${Object.keys(lookupDict).length} SKU names from lookup list.`);
+      }
+    } catch (err: any) {
+      console.warn('Gagal memuat lookup nama produk dari Google Sheet:', err.message);
+    }
+
+    // 2. Fetch the primary rack layout sheet (gid=0)
+    try {
+      let racksResponse = await fetch(SHEET_RACKS_WEB_URL);
+      if (!racksResponse.ok) {
+        racksResponse = await fetch(SHEET_RACKS_EXPORT_URL);
+      }
+
+      if (!racksResponse.ok) {
+        throw new Error(`HTTP ${racksResponse.status}`);
+      }
+
+      const racksCsvText = await racksResponse.text();
+      if (racksCsvText.trim().startsWith('<!DOCTYPE html>')) {
+        throw new Error('Google Sheets mengembalikan halaman login. Pastikan lembar kerja dipublikasikan ke web (Entire Document / Seluruh Dokumen).');
+      }
+
+      const parsed = parseCSV(racksCsvText, lookupDict);
 
       if (parsed.length > 0) {
         setItems(parsed);
@@ -46,14 +81,18 @@ export default function App() {
         setLastSynced(new Date());
         setSyncError(null);
       } else {
-        throw new Error('Data CSV kosong atau tidak valid.');
+        throw new Error('Data rak kosong atau tidak ada SKU valid yang cocok.');
       }
     } catch (err: any) {
       console.warn('Sync gagal. Menggunakan data offline cadangan:', err.message);
-      setSyncError('Koneksi Google Sheets dibatasi oleh CORS/jaringan. Menggunakan data lokal (offline).');
       
-      // Ensure we are utilizing fallback data if nothing is set
-      if (items.length === 0) {
+      let errMsg = 'Koneksi Google Sheets dibatasi atau file belum dipublikasikan ke web.';
+      if (err.message && err.message.includes('login')) {
+        errMsg = 'Harap publikasikan Google Sheets Anda sebagai "Entire Document" di menu File -> Share -> Publish to Web agar data Rack & Nama Produk terbaca live di Vercel.';
+      }
+      setSyncError(errMsg);
+      
+      if (items.length === 0 || syncSource === 'fallback') {
         setItems(FALLBACK_SKU_ITEMS);
         setSyncSource('fallback');
         setLastSynced(new Date());
@@ -61,7 +100,7 @@ export default function App() {
     } finally {
       setIsSyncing(false);
     }
-  }, [items.length]);
+  }, [items.length, syncSource]);
 
   // Sync silently once on startup
   useEffect(() => {

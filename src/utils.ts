@@ -5,7 +5,14 @@
 
 import { SKUItem, RackSummary, GreetingType } from './types';
 
-export const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1eHRf5foF3bDqApK3EKHHI7hSDSJu4gFGUPT4kHNle2M/export?format=csv&gid=0';
+export const SHEET_RACKS_WEB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSTNv0sg794H-l96l52IrvRqyc9GBmp-uIxm-5wbAcGBPrzl2c6r_mFlZkgoh8eZYcrCaysrCfnEjVU/pub?gid=0&single=true&output=csv';
+export const SHEET_RACKS_EXPORT_URL = 'https://docs.google.com/spreadsheets/d/1eHRf5foF3bDqApK3EKHHI7hSDSJu4gFGUPT4kHNle2M/export?format=csv&gid=0';
+
+export const SHEET_INVEN_WEB_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSTNv0sg794H-l96l52IrvRqyc9GBmp-uIxm-5wbAcGBPrzl2c6r_mFlZkgoh8eZYcrCaysrCfnEjVU/pub?gid=273517020&single=true&output=csv';
+export const SHEET_INVEN_EXPORT_URL = 'https://docs.google.com/spreadsheets/d/1eHRf5foF3bDqApK3EKHHI7hSDSJu4gFGUPT4kHNle2M/export?format=csv&gid=273517020';
+
+// Keep SHEET_CSV_URL for backward compatibility
+export const SHEET_CSV_URL = SHEET_RACKS_WEB_URL;
 
 /**
  * Splits a CSV line by commas while correctly handling double-quoted fields
@@ -30,11 +37,36 @@ export function splitCSVLine(line: string): string[] {
 }
 
 /**
+ * Parses the INVEN sheet (SKU,NAME,QTY) as a lookup map of SKU -> Product Name
+ */
+export function parseInvenLookup(csvText: string): Record<string, string> {
+  const lines = csvText.split(/\r?\n/);
+  const lookup: Record<string, string> = {};
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const cols = splitCSVLine(line);
+    if (cols.length < 2) continue;
+
+    const sku = cols[0].trim();
+    const name = cols[1].trim();
+
+    if (sku && name && name.toUpperCase() !== 'NOT FOUND') {
+      lookup[sku] = name;
+    }
+  }
+
+  return lookup;
+}
+
+/**
  * Parses a CSV string into a list of SKU items.
  * Handles rack-code inheritance (where rackCode is blank and inherits from the previous non-blank row).
  * Specifically maps Column C (NAME), Column D (TOTAL QTY), and Column E (KLASIFIKASI).
  */
-export function parseCSV(csvText: string): SKUItem[] {
+export function parseCSV(csvText: string, lookupDict?: Record<string, string>): SKUItem[] {
   const lines = csvText.split(/\r?\n/);
   const items: SKUItem[] = [];
   let currentRackCode = '';
@@ -49,20 +81,29 @@ export function parseCSV(csvText: string): SKUItem[] {
 
     const rawRackCode = cols[0].trim();
     const rawSku = cols[1].trim();
-    const rawName = cols[2].trim();
+    let rawName = cols[2].trim();
     const rawQtyStr = cols[3].trim();
     const rawClassification = cols[4].trim().toUpperCase();
 
     // Skip empty sku lines
     if (!rawSku) continue;
 
-    // Skip "NOT FOUND" items
+    // Skip "NOT FOUND" items unless they exist in the lookup dictionary
     if (rawName.toUpperCase() === 'NOT FOUND' || rawClassification === 'NOT FOUND') {
-      continue;
+      if (lookupDict && lookupDict[rawSku]) {
+        rawName = lookupDict[rawSku];
+      } else {
+        continue;
+      }
     }
 
     if (rawRackCode) {
       currentRackCode = rawRackCode;
+    }
+
+    // Enrich name with lookup dictionary if available
+    if (lookupDict && lookupDict[rawSku]) {
+      rawName = lookupDict[rawSku];
     }
 
     const qty = parseInt(rawQtyStr, 10) || 0;
